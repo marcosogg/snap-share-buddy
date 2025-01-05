@@ -1,5 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
-import { Configuration, OpenAIApi } from 'https://esm.sh/openai@3.3.0'
+import { OpenAI } from "https://deno.land/x/openai@v4.24.0/mod.ts"
 import "https://deno.land/x/xhr@0.1.0/mod.ts"
 
 const corsHeaders = {
@@ -26,32 +26,31 @@ serve(async (req) => {
 
     console.log('Processing image URL:', image);
 
-    // Initialize OpenAI
-    const configuration = new Configuration({
+    // Initialize OpenAI with the new v4 client
+    const openai = new OpenAI({
       apiKey: Deno.env.get('OPENAI_API_KEY'),
-    })
-    const openai = new OpenAIApi(configuration)
+    });
 
     try {
-      // Call OpenAI API with proper vision model format
-      const completion = await openai.createChatCompletion({
+      const completion = await openai.chat.completions.create({
         model: "gpt-4o-mini",
         messages: [
           {
             role: "user",
-            content: [
-              {
-                type: "text",
-                text: "Analyze this image and identify visible words or objects. For each one, provide its definition and a sample sentence. Format your response as a JSON array with objects containing 'word', 'definition', and 'sampleSentence' fields."
-              },
-              {
-                type: "image_url",
-                image_url: {
-                  url: image,
-                  detail: "low"
-                }
+            content: {
+              type: "text",
+              text: "Analyze this image and identify visible words or objects. For each one, provide its definition and a sample sentence. Format your response as a JSON array with objects containing 'word', 'definition', and 'sampleSentence' fields."
+            }
+          },
+          {
+            role: "user",
+            content: {
+              type: "image_url",
+              image_url: {
+                url: image,
+                detail: "low"
               }
-            ]
+            }
           }
         ],
         max_tokens: 1000
@@ -59,7 +58,7 @@ serve(async (req) => {
 
       console.log('OpenAI API response received');
 
-      const content = completion.data.choices[0].message.content;
+      const content = completion.choices[0].message.content;
       console.log('Raw content:', content);
 
       let parsedAnalysis;
