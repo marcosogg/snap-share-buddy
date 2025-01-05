@@ -3,6 +3,8 @@ import { Upload } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
 import { cn } from '@/lib/utils';
 import { supabase } from "@/integrations/supabase/client";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 
 interface AnalysisResult {
   word: string;
@@ -56,7 +58,6 @@ const ImageUploader = () => {
     setAnalysisResults([]);
 
     try {
-      // First, upload the file to Supabase Storage
       const fileName = `${crypto.randomUUID()}-${file.name}`;
       const { data: uploadData, error: uploadError } = await supabase.storage
         .from('analyzed_images')
@@ -66,14 +67,12 @@ const ImageUploader = () => {
         throw new Error(`Failed to upload image: ${uploadError.message}`);
       }
 
-      // Get the public URL for the uploaded image
       const { data: { publicUrl } } = supabase.storage
         .from('analyzed_images')
         .getPublicUrl(fileName);
 
       setImage(publicUrl);
 
-      // Now send the public URL to our analyze-image function
       const { data, error } = await supabase.functions.invoke('analyze-image', {
         body: JSON.stringify({ image: publicUrl }),
       });
@@ -101,12 +100,18 @@ const ImageUploader = () => {
   };
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-start bg-gray-50 p-4">
+    <div className="min-h-screen flex flex-col items-center justify-start bg-gray-50 dark:bg-gray-900 p-4">
       <div className="w-full max-w-4xl space-y-6">
-        <div className="text-center space-y-2">
-          <h1 className="text-3xl font-bold text-gray-900">Image to Dictionary</h1>
-          <p className="text-gray-500">Upload an image to identify words and objects, get their definitions and example sentences</p>
-        </div>
+        <Card className="border-none shadow-lg">
+          <CardHeader className="text-center">
+            <CardTitle className="text-3xl font-bold bg-gradient-to-r from-purple-600 to-blue-500 bg-clip-text text-transparent">
+              Image to Dictionary
+            </CardTitle>
+            <CardDescription className="text-lg">
+              Upload an image to identify words and objects, get their definitions and example sentences
+            </CardDescription>
+          </CardHeader>
+        </Card>
 
         <div
           onDragOver={handleDragOver}
@@ -114,8 +119,8 @@ const ImageUploader = () => {
           onDrop={handleDrop}
           className={cn(
             "relative border-2 border-dashed rounded-lg p-12 transition-all ease-in-out duration-200",
-            isDragging ? "border-blue-500 bg-blue-50" : "border-gray-300 hover:border-gray-400",
-            image ? "bg-white" : "bg-gray-50"
+            isDragging ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20" : "border-gray-300 hover:border-gray-400 dark:border-gray-700 dark:hover:border-gray-600",
+            image ? "bg-white dark:bg-gray-800" : "bg-gray-50 dark:bg-gray-900"
           )}
         >
           <input
@@ -129,7 +134,7 @@ const ImageUploader = () => {
           {isLoading ? (
             <div className="text-center">
               <div className="w-16 h-16 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto"></div>
-              <p className="mt-4 text-sm text-gray-500">Analyzing image...</p>
+              <p className="mt-4 text-sm text-gray-500 dark:text-gray-400">Analyzing image...</p>
             </div>
           ) : image ? (
             <div className="relative group">
@@ -146,24 +151,35 @@ const ImageUploader = () => {
             </div>
           ) : (
             <div className="text-center">
-              <Upload className="mx-auto h-12 w-12 text-gray-400" />
-              <p className="mt-4 text-sm text-gray-500">PNG, JPG, GIF up to 10MB</p>
+              <Upload className="mx-auto h-12 w-12 text-gray-400 dark:text-gray-600" />
+              <p className="mt-4 text-sm text-gray-500 dark:text-gray-400">PNG, JPG, GIF up to 10MB</p>
             </div>
           )}
         </div>
 
         {analysisResults.length > 0 && (
-          <div className="bg-white rounded-lg shadow-lg p-6 space-y-6">
-            <h2 className="text-2xl font-semibold text-gray-900">Analysis Results</h2>
-            <div className="grid gap-6">
-              {analysisResults.map((result, index) => (
-                <div key={index} className="border rounded-lg p-4 space-y-2">
-                  <h3 className="text-xl font-medium text-gray-900">{result.word}</h3>
-                  <p className="text-gray-600"><span className="font-medium">Definition:</span> {result.definition}</p>
-                  <p className="text-gray-600"><span className="font-medium">Example:</span> {result.sampleSentence}</p>
-                </div>
-              ))}
-            </div>
+          <div className="grid gap-6 md:grid-cols-2">
+            {analysisResults.map((result, index) => (
+              <Card key={index} className="overflow-hidden transition-all duration-200 hover:shadow-lg">
+                <CardHeader className="space-y-1 pb-4">
+                  <div className="flex items-center justify-between">
+                    <Badge variant="secondary" className="text-lg px-3 py-1">
+                      {result.word}
+                    </Badge>
+                  </div>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div>
+                    <h4 className="text-sm font-medium text-muted-foreground mb-2">Definition</h4>
+                    <p className="text-sm">{result.definition}</p>
+                  </div>
+                  <div>
+                    <h4 className="text-sm font-medium text-muted-foreground mb-2">Example</h4>
+                    <p className="text-sm italic">{result.sampleSentence}</p>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
           </div>
         )}
       </div>
