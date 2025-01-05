@@ -18,8 +18,8 @@ serve(async (req) => {
     const formData = await req.formData()
     const file = formData.get('file')
 
-    if (!file) {
-      throw new Error('No file uploaded')
+    if (!file || !(file instanceof File)) {
+      throw new Error('No valid file uploaded')
     }
 
     // Initialize Supabase client
@@ -30,9 +30,15 @@ serve(async (req) => {
 
     // Upload file to Supabase Storage
     const fileName = `${crypto.randomUUID()}-${file.name}`
+    const arrayBuffer = await file.arrayBuffer()
+    const fileBuffer = new Uint8Array(arrayBuffer)
+
     const { error: uploadError } = await supabaseAdmin.storage
       .from('analyzed_images')
-      .upload(fileName, file)
+      .upload(fileName, fileBuffer, {
+        contentType: file.type,
+        upsert: false
+      })
 
     if (uploadError) {
       throw new Error(`Failed to upload file: ${uploadError.message}`)
@@ -67,7 +73,6 @@ serve(async (req) => {
           ],
         },
       ],
-      max_tokens: 1000,
     })
 
     const analysisResult = response.data.choices[0].message.content
