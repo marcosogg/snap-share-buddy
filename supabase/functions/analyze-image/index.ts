@@ -37,14 +37,14 @@ serve(async (req) => {
         messages: [
           {
             role: "system",
-            content: "You are an AI that analyzes images and provides detailed information about visible objects and words. Format your responses as JSON arrays containing objects with 'word', 'definition', and 'sampleSentence' fields."
+            content: "You are an AI that analyzes images and provides detailed information about visible objects and words. Format your responses as JSON arrays containing objects with 'word', 'definition', and 'sampleSentence' fields. Do not include any markdown formatting or additional text."
           },
           {
             role: "user",
             content: [
               {
                 type: "text",
-                text: "Analyze this image and identify visible words or objects. For each one, provide its definition and a sample sentence."
+                text: "Analyze this image and identify visible words or objects. For each one, provide its definition and a sample sentence. Return ONLY a JSON array."
               },
               {
                 type: "image_url",
@@ -66,7 +66,13 @@ serve(async (req) => {
 
       let parsedAnalysis;
       try {
-        parsedAnalysis = JSON.parse(content);
+        // Remove any potential markdown formatting and clean the string
+        const cleanContent = content
+          .replace(/```json\s?/g, '')
+          .replace(/```\s?/g, '')
+          .trim();
+        
+        parsedAnalysis = JSON.parse(cleanContent);
         console.log('Successfully parsed JSON response');
       } catch (parseError) {
         console.error('Failed to parse JSON response:', parseError);
