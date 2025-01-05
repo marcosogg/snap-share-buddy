@@ -56,29 +56,32 @@ const ImageUploader = () => {
     setAnalysisResults([]);
 
     try {
-      // Create form data for the file
-      const formData = new FormData();
-      formData.append('file', file);
+      // First, upload the file to Supabase Storage
+      const fileName = `${crypto.randomUUID()}-${file.name}`;
+      const { data: uploadData, error: uploadError } = await supabase.storage
+        .from('analyzed_images')
+        .upload(fileName, file);
 
-      // Call the analyze-image function
+      if (uploadError) {
+        throw new Error(`Failed to upload image: ${uploadError.message}`);
+      }
+
+      // Get the public URL for the uploaded image
+      const { data: { publicUrl } } = supabase.storage
+        .from('analyzed_images')
+        .getPublicUrl(fileName);
+
+      setImage(publicUrl);
+
+      // Now send the public URL to our analyze-image function
       const { data, error } = await supabase.functions.invoke('analyze-image', {
-        body: formData,
+        body: JSON.stringify({ image: publicUrl }),
       });
 
       if (error) {
         throw error;
       }
 
-      if (!data) {
-        throw new Error('No data received from analysis');
-      }
-
-      // Get the public URL for the uploaded image
-      const { data: { publicUrl } } = supabase.storage
-        .from('analyzed_images')
-        .getPublicUrl(data.imagePath);
-
-      setImage(publicUrl);
       setAnalysisResults(data.analysis);
 
       toast({

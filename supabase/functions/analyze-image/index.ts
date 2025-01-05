@@ -14,40 +14,15 @@ serve(async (req) => {
   }
 
   try {
-    // Get the form data
-    const formData = await req.formData()
-    const file = formData.get('file')
-
-    if (!file || !(file instanceof File)) {
-      throw new Error('No valid file uploaded')
+    // Get the image data from the request body
+    const { image } = await req.json()
+    
+    if (!image) {
+      return new Response(
+        JSON.stringify({ error: 'No image data provided' }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
+      )
     }
-
-    // Initialize Supabase client
-    const supabaseAdmin = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-    )
-
-    // Upload file to Supabase Storage
-    const fileName = `${crypto.randomUUID()}-${file.name}`
-    const arrayBuffer = await file.arrayBuffer()
-    const fileBuffer = new Uint8Array(arrayBuffer)
-
-    const { error: uploadError } = await supabaseAdmin.storage
-      .from('analyzed_images')
-      .upload(fileName, fileBuffer, {
-        contentType: file.type,
-        upsert: false
-      })
-
-    if (uploadError) {
-      throw new Error(`Failed to upload file: ${uploadError.message}`)
-    }
-
-    // Get public URL of uploaded image
-    const { data: { publicUrl } } = supabaseAdmin.storage
-      .from('analyzed_images')
-      .getPublicUrl(fileName)
 
     // Initialize OpenAI
     const configuration = new Configuration({
@@ -68,7 +43,7 @@ serve(async (req) => {
             },
             {
               type: "image_url",
-              image_url: publicUrl,
+              image_url: image,
             },
           ],
         },
@@ -84,29 +59,13 @@ serve(async (req) => {
       parsedAnalysis = []
     }
 
-    // Store analysis results
-    const { error: dbError } = await supabaseAdmin
-      .from('image_analysis')
-      .insert({
-        image_path: fileName,
-        analysis_data: parsedAnalysis
-      })
-
-    if (dbError) {
-      throw new Error(`Failed to save analysis results: ${dbError.message}`)
-    }
-
     return new Response(
       JSON.stringify({ 
-        message: 'Image analyzed successfully',
         analysis: parsedAnalysis,
-        imagePath: fileName
       }),
       { 
-        headers: { 
-          ...corsHeaders, 
-          'Content-Type': 'application/json' 
-        }
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 200 
       }
     )
   } catch (error) {
@@ -116,11 +75,8 @@ serve(async (req) => {
         error: error.message || 'An unexpected error occurred'
       }),
       { 
-        headers: { 
-          ...corsHeaders, 
-          'Content-Type': 'application/json' 
-        },
-        status: 400
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 500
       }
     )
   }
