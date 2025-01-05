@@ -30,6 +30,30 @@ export type Database = {
         }
         Relationships: []
       }
+      word_analyses: {
+        Row: {
+          created_at: string | null
+          definition: string
+          id: string
+          sample_sentence: string
+          word: string
+        }
+        Insert: {
+          created_at?: string | null
+          definition: string
+          id?: string
+          sample_sentence: string
+          word: string
+        }
+        Update: {
+          created_at?: string | null
+          definition?: string
+          id?: string
+          sample_sentence?: string
+          word?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never

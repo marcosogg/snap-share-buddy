@@ -2,6 +2,9 @@ import React, { useState } from 'react';
 import { useToast } from '@/components/ui/use-toast';
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Link } from "react-router-dom";
+import { FileText } from "lucide-react";
 import ImageUploadArea from './ImageUploadArea';
 import AnalysisResults from './AnalysisResults';
 
@@ -54,11 +57,32 @@ const ImageUploader = () => {
         throw error;
       }
 
-      setAnalysisResults(data.analysis);
+      const results = data.analysis;
+      setAnalysisResults(results);
+
+      // Save each analysis result to Supabase
+      for (const result of results) {
+        const { error: insertError } = await supabase
+          .from('word_analyses')
+          .insert({
+            word: result.word,
+            definition: result.definition,
+            sample_sentence: result.sampleSentence,
+          });
+
+        if (insertError) {
+          console.error('Error saving analysis:', insertError);
+          toast({
+            variant: "destructive",
+            title: "Error saving analysis",
+            description: "Some analyses couldn't be saved to the database.",
+          });
+        }
+      }
 
       toast({
         title: "Success!",
-        description: "Image analyzed successfully.",
+        description: "Image analyzed and results saved successfully.",
       });
     } catch (error) {
       console.error('Error analyzing image:', error);
@@ -84,6 +108,14 @@ const ImageUploader = () => {
               Upload an image to identify words and objects, get their definitions and example sentences
             </CardDescription>
           </CardHeader>
+          <CardContent className="flex justify-center">
+            <Link to="/saved-analyses">
+              <Button variant="outline" className="gap-2">
+                <FileText className="w-4 h-4" />
+                View Saved Analyses
+              </Button>
+            </Link>
+          </CardContent>
         </Card>
 
         <ImageUploadArea 
