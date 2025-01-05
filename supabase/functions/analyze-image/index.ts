@@ -1,5 +1,4 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1'
 import { Configuration, OpenAIApi } from 'https://esm.sh/openai@3.3.0'
 
 const corsHeaders = {
@@ -19,10 +18,12 @@ serve(async (req) => {
     
     if (!image) {
       return new Response(
-        JSON.stringify({ error: 'No image data provided' }),
+        JSON.stringify({ error: 'No image URL provided' }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
       )
     }
+
+    console.log('Analyzing image:', image);
 
     // Initialize OpenAI
     const configuration = new Configuration({
@@ -30,33 +31,44 @@ serve(async (req) => {
     })
     const openai = new OpenAIApi(configuration)
 
-    // Analyze image with OpenAI
+    // Analyze image with OpenAI using the recommended model
     const response = await openai.createChatCompletion({
       model: "gpt-4o-mini",
       messages: [
         {
           role: "user",
           content: [
-            { 
-              type: "text", 
-              text: "Please identify any visible words or objects in this image. For each word or object, provide its definition and a sample sentence using it. Format the response as a JSON array with objects containing 'word', 'definition', and 'sampleSentence' fields." 
+            {
+              type: "text",
+              text: "Please identify any visible words or objects in this image. For each word or object, provide its definition and a sample sentence using it. Format the response as a JSON array with objects containing 'word', 'definition', and 'sampleSentence' fields."
             },
             {
               type: "image_url",
-              image_url: image,
-            },
-          ],
-        },
-      ],
+              image_url: {
+                url: image,
+              }
+            }
+          ]
+        }
+      ]
     })
 
-    const analysisResult = response.data.choices[0].message.content
-    let parsedAnalysis
+    console.log('OpenAI response:', response.data);
+
+    const analysisResult = response.data.choices[0].message.content;
+    let parsedAnalysis;
+    
     try {
-      parsedAnalysis = JSON.parse(analysisResult)
+      parsedAnalysis = JSON.parse(analysisResult);
     } catch (e) {
-      console.error('Failed to parse OpenAI response:', analysisResult)
-      parsedAnalysis = []
+      console.error('Failed to parse OpenAI response:', analysisResult);
+      console.error('Parse error:', e);
+      // If parsing fails, create a structured response from the raw text
+      parsedAnalysis = [{
+        word: "Analysis Result",
+        definition: "Raw analysis from image",
+        sampleSentence: analysisResult
+      }];
     }
 
     return new Response(
@@ -69,10 +81,10 @@ serve(async (req) => {
       }
     )
   } catch (error) {
-    console.error('Error in analyze-image function:', error)
+    console.error('Error in analyze-image function:', error);
     return new Response(
       JSON.stringify({ 
-        error: error.message || 'An unexpected error occurred'
+        error: error.message || 'An unexpected error occurred during image analysis'
       }),
       { 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
