@@ -8,42 +8,38 @@ const corsHeaders = {
 }
 
 serve(async (req) => {
+  // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders })
   }
 
   try {
+    // Get the form data
     const formData = await req.formData()
     const file = formData.get('file')
 
     if (!file) {
-      return new Response(
-        JSON.stringify({ error: 'No file uploaded' }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
-      )
+      throw new Error('No file uploaded')
     }
 
     // Initialize Supabase client
-    const supabase = createClient(
+    const supabaseAdmin = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
     // Upload file to Supabase Storage
     const fileName = `${crypto.randomUUID()}-${file.name}`
-    const { data: uploadData, error: uploadError } = await supabase.storage
+    const { error: uploadError } = await supabaseAdmin.storage
       .from('analyzed_images')
       .upload(fileName, file)
 
     if (uploadError) {
-      return new Response(
-        JSON.stringify({ error: 'Failed to upload file', details: uploadError }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
-      )
+      throw new Error(`Failed to upload file: ${uploadError.message}`)
     }
 
     // Get public URL of uploaded image
-    const { data: { publicUrl } } = supabase.storage
+    const { data: { publicUrl } } = supabaseAdmin.storage
       .from('analyzed_images')
       .getPublicUrl(fileName)
 
@@ -55,12 +51,15 @@ serve(async (req) => {
 
     // Analyze image with OpenAI
     const response = await openai.createChatCompletion({
-      model: "gpt-4-vision-preview",
+      model: "gpt-4o-mini",
       messages: [
         {
           role: "user",
           content: [
-            { type: "text", text: "Please identify any visible words or objects in this image. For each word or object, provide its definition and a sample sentence using it. Format the response as a JSON array with objects containing 'word', 'definition', and 'sampleSentence' fields." },
+            { 
+              type: "text", 
+              text: "Please identify any visible words or objects in this image. For each word or object, provide its definition and a sample sentence using it. Format the response as a JSON array with objects containing 'word', 'definition', and 'sampleSentence' fields." 
+            },
             {
               type: "image_url",
               image_url: publicUrl,
@@ -76,14 +75,12 @@ serve(async (req) => {
     try {
       parsedAnalysis = JSON.parse(analysisResult)
     } catch (e) {
-      parsedAnalysis = {
-        raw: analysisResult,
-        error: "Could not parse as JSON"
-      }
+      console.error('Failed to parse OpenAI response:', analysisResult)
+      parsedAnalysis = []
     }
 
-    // Store analysis results in database
-    const { error: dbError } = await supabase
+    // Store analysis results
+    const { error: dbError } = await supabaseAdmin
       .from('image_analysis')
       .insert({
         image_path: fileName,
@@ -91,10 +88,7 @@ serve(async (req) => {
       })
 
     if (dbError) {
-      return new Response(
-        JSON.stringify({ error: 'Failed to save analysis results', details: dbError }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
-      )
+      throw new Error(`Failed to save analysis results: ${dbError.message}`)
     }
 
     return new Response(
@@ -103,12 +97,26 @@ serve(async (req) => {
         analysis: parsedAnalysis,
         imagePath: fileName
       }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
+      { 
+        headers: { 
+          ...corsHeaders, 
+          'Content-Type': 'application/json' 
+        }
+      }
     )
   } catch (error) {
+    console.error('Error in analyze-image function:', error)
     return new Response(
-      JSON.stringify({ error: 'An unexpected error occurred', details: error.message }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
+      JSON.stringify({ 
+        error: error.message || 'An unexpected error occurred'
+      }),
+      { 
+        headers: { 
+          ...corsHeaders, 
+          'Content-Type': 'application/json' 
+        },
+        status: 400
+      }
     )
   }
 })

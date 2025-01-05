@@ -61,21 +61,25 @@ const ImageUploader = () => {
       formData.append('file', file);
 
       // Call the analyze-image function
-      const { data: functionData } = await supabase.functions.invoke('analyze-image', {
+      const { data, error } = await supabase.functions.invoke('analyze-image', {
         body: formData,
       });
 
-      if (functionData.error) {
-        throw new Error(functionData.error);
+      if (error) {
+        throw error;
+      }
+
+      if (!data) {
+        throw new Error('No data received from analysis');
       }
 
       // Get the public URL for the uploaded image
       const { data: { publicUrl } } = supabase.storage
         .from('analyzed_images')
-        .getPublicUrl(functionData.imagePath);
+        .getPublicUrl(data.imagePath);
 
       setImage(publicUrl);
-      setAnalysisResults(functionData.analysis);
+      setAnalysisResults(data.analysis);
 
       toast({
         title: "Success!",
@@ -86,7 +90,7 @@ const ImageUploader = () => {
       toast({
         variant: "destructive",
         title: "Analysis failed",
-        description: "There was an error analyzing your image.",
+        description: error.message || "There was an error analyzing your image.",
       });
     } finally {
       setIsLoading(false);
