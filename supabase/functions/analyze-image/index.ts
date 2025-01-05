@@ -36,21 +36,24 @@ serve(async (req) => {
         model: "gpt-4o-mini",
         messages: [
           {
-            role: "user",
-            content: {
-              type: "text",
-              text: "Analyze this image and identify visible words or objects. For each one, provide its definition and a sample sentence. Format your response as a JSON array with objects containing 'word', 'definition', and 'sampleSentence' fields."
-            }
+            role: "system",
+            content: "You are an AI that analyzes images and provides detailed information about visible objects and words. Format your responses as JSON arrays containing objects with 'word', 'definition', and 'sampleSentence' fields."
           },
           {
             role: "user",
-            content: {
-              type: "image_url",
-              image_url: {
-                url: image,
-                detail: "low"
+            content: [
+              {
+                type: "text",
+                text: "Analyze this image and identify visible words or objects. For each one, provide its definition and a sample sentence."
+              },
+              {
+                type: "image_url",
+                image_url: {
+                  url: image,
+                  detail: "low"
+                }
               }
-            }
+            ]
           }
         ],
         max_tokens: 1000
