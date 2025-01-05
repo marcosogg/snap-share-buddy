@@ -3,14 +3,6 @@ import { Upload } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
 import { cn } from '@/lib/utils';
 import { supabase } from "@/integrations/supabase/client";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 
 interface AnalysisResult {
   word: string;
@@ -64,6 +56,7 @@ const ImageUploader = () => {
     setAnalysisResults([]);
 
     try {
+      // First, upload the file to Supabase Storage
       const fileName = `${crypto.randomUUID()}-${file.name}`;
       const { data: uploadData, error: uploadError } = await supabase.storage
         .from('analyzed_images')
@@ -73,12 +66,14 @@ const ImageUploader = () => {
         throw new Error(`Failed to upload image: ${uploadError.message}`);
       }
 
+      // Get the public URL for the uploaded image
       const { data: { publicUrl } } = supabase.storage
         .from('analyzed_images')
         .getPublicUrl(fileName);
 
       setImage(publicUrl);
 
+      // Now send the public URL to our analyze-image function
       const { data, error } = await supabase.functions.invoke('analyze-image', {
         body: JSON.stringify({ image: publicUrl }),
       });
@@ -158,27 +153,17 @@ const ImageUploader = () => {
         </div>
 
         {analysisResults.length > 0 && (
-          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-            {analysisResults.map((result, index) => (
-              <Card key={index} className="overflow-hidden">
-                <CardHeader className="space-y-1">
-                  <div className="flex items-center justify-between">
-                    <CardTitle className="text-xl">{result.word}</CardTitle>
-                    <Badge variant="secondary">Word {index + 1}</Badge>
-                  </div>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div>
-                    <h4 className="font-medium text-sm text-gray-500 mb-1">Definition</h4>
-                    <p className="text-sm">{result.definition}</p>
-                  </div>
-                  <div>
-                    <h4 className="font-medium text-sm text-gray-500 mb-1">Example</h4>
-                    <p className="text-sm italic">{result.sampleSentence}</p>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
+          <div className="bg-white rounded-lg shadow-lg p-6 space-y-6">
+            <h2 className="text-2xl font-semibold text-gray-900">Analysis Results</h2>
+            <div className="grid gap-6">
+              {analysisResults.map((result, index) => (
+                <div key={index} className="border rounded-lg p-4 space-y-2">
+                  <h3 className="text-xl font-medium text-gray-900">{result.word}</h3>
+                  <p className="text-gray-600"><span className="font-medium">Definition:</span> {result.definition}</p>
+                  <p className="text-gray-600"><span className="font-medium">Example:</span> {result.sampleSentence}</p>
+                </div>
+              ))}
+            </div>
           </div>
         )}
       </div>

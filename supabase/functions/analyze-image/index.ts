@@ -8,11 +8,13 @@ const corsHeaders = {
 }
 
 serve(async (req) => {
+  // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders })
   }
 
   try {
+    // Get the image data from the request body
     const { image } = await req.json()
     
     if (!image) {
@@ -24,6 +26,7 @@ serve(async (req) => {
 
     console.log('Processing image URL:', image);
 
+    // Initialize OpenAI with the new v4 client
     const openai = new OpenAI({
       apiKey: Deno.env.get('OPENAI_API_KEY'),
     });
@@ -63,20 +66,16 @@ serve(async (req) => {
 
       let parsedAnalysis;
       try {
-        // Attempt to parse the JSON response
         parsedAnalysis = JSON.parse(content);
-        
-        // Validate the structure of each item
-        parsedAnalysis = parsedAnalysis.map(item => ({
-          word: item.word || 'Unknown',
-          definition: item.definition || 'No definition available',
-          sampleSentence: item.sampleSentence || 'No example available'
-        }));
-
-        console.log('Successfully parsed and validated JSON response');
+        console.log('Successfully parsed JSON response');
       } catch (parseError) {
         console.error('Failed to parse JSON response:', parseError);
-        throw new Error('Failed to parse AI response');
+        // Provide a structured fallback if parsing fails
+        parsedAnalysis = [{
+          word: "Analysis Result",
+          definition: "Raw analysis from image",
+          sampleSentence: content
+        }];
       }
 
       return new Response(
