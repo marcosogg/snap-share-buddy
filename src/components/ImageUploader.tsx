@@ -1,12 +1,20 @@
 import React, { useState, useCallback } from 'react';
-import { Upload, Image as ImageIcon } from 'lucide-react';
+import { Upload } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
 import { cn } from '@/lib/utils';
+import { supabase } from "@/integrations/supabase/client";
+
+interface AnalysisResult {
+  word: string;
+  definition: string;
+  sampleSentence: string;
+}
 
 const ImageUploader = () => {
   const [isDragging, setIsDragging] = useState(false);
   const [image, setImage] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [analysisResults, setAnalysisResults] = useState<AnalysisResult[]>([]);
   const { toast } = useToast();
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
@@ -34,7 +42,7 @@ const ImageUploader = () => {
     }
   };
 
-  const handleImageUpload = (file: File) => {
+  const handleImageUpload = async (file: File) => {
     if (!file.type.startsWith('image/')) {
       toast({
         variant: "destructive",
@@ -45,35 +53,52 @@ const ImageUploader = () => {
     }
 
     setIsLoading(true);
-    const reader = new FileReader();
-    
-    reader.onload = (e) => {
-      setIsLoading(false);
-      setImage(e.target?.result as string);
+    setAnalysisResults([]);
+
+    try {
+      // Create form data for the file
+      const formData = new FormData();
+      formData.append('file', file);
+
+      // Call the analyze-image function
+      const { data: functionData } = await supabase.functions.invoke('analyze-image', {
+        body: formData,
+      });
+
+      if (functionData.error) {
+        throw new Error(functionData.error);
+      }
+
+      // Get the public URL for the uploaded image
+      const { data: { publicUrl } } = supabase.storage
+        .from('analyzed_images')
+        .getPublicUrl(functionData.imagePath);
+
+      setImage(publicUrl);
+      setAnalysisResults(functionData.analysis);
+
       toast({
         title: "Success!",
-        description: "Image uploaded successfully.",
+        description: "Image analyzed successfully.",
       });
-    };
-
-    reader.onerror = () => {
-      setIsLoading(false);
+    } catch (error) {
+      console.error('Error analyzing image:', error);
       toast({
         variant: "destructive",
-        title: "Upload failed",
-        description: "There was an error uploading your image.",
+        title: "Analysis failed",
+        description: "There was an error analyzing your image.",
       });
-    };
-
-    reader.readAsDataURL(file);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
-      <div className="w-full max-w-2xl space-y-6">
+    <div className="min-h-screen flex flex-col items-center justify-start bg-gray-50 p-4">
+      <div className="w-full max-w-4xl space-y-6">
         <div className="text-center space-y-2">
-          <h1 className="text-3xl font-bold text-gray-900">Image Uploader</h1>
-          <p className="text-gray-500">Drag and drop your image here, or click to select a file</p>
+          <h1 className="text-3xl font-bold text-gray-900">Image to Dictionary</h1>
+          <p className="text-gray-500">Upload an image to identify words and objects, get their definitions and example sentences</p>
         </div>
 
         <div
@@ -97,7 +122,7 @@ const ImageUploader = () => {
           {isLoading ? (
             <div className="text-center">
               <div className="w-16 h-16 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto"></div>
-              <p className="mt-4 text-sm text-gray-500">Uploading...</p>
+              <p className="mt-4 text-sm text-gray-500">Analyzing image...</p>
             </div>
           ) : image ? (
             <div className="relative group">
@@ -119,6 +144,21 @@ const ImageUploader = () => {
             </div>
           )}
         </div>
+
+        {analysisResults.length > 0 && (
+          <div className="bg-white rounded-lg shadow-lg p-6 space-y-6">
+            <h2 className="text-2xl font-semibold text-gray-900">Analysis Results</h2>
+            <div className="grid gap-6">
+              {analysisResults.map((result, index) => (
+                <div key={index} className="border rounded-lg p-4 space-y-2">
+                  <h3 className="text-xl font-medium text-gray-900">{result.word}</h3>
+                  <p className="text-gray-600"><span className="font-medium">Definition:</span> {result.definition}</p>
+                  <p className="text-gray-600"><span className="font-medium">Example:</span> {result.sampleSentence}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
